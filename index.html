@@ -104,18 +104,20 @@
             transition: left 0.1s linear, bottom 0.1s linear, transform 0.2s;
         }
 
-        /* Girl: Short (~100px) */
+        /* Girl: Short (~100px) - Flipped to face Right */
         .sprite-nan { 
             width: 80px; 
             height: 100px; 
-            background-image: url('nanlp-idle-removebg-preview.png'); 
+            background-image: url('nanlp-idle-removebg-preview.png');
+            transform: scaleX(-1); 
         }
 
-        /* Guy: Tall (~180px) */
+        /* Guy: Tall (~180px) - Flipped to face Left */
         .sprite-harsh { 
             width: 64px; 
             height: 180px; 
-            background-image: url('harshpromlp-idle-removebg-preview.png'); 
+            background-image: url('harshpromlp-idle-v1.png'); 
+            transform: scaleX(-1);
         }
 
         /* --- LEVEL 1: BRIDGE --- */
@@ -285,7 +287,7 @@
         // --- ASSET CONFIGURATION ---
         const ASSETS = {
             nan: 'nanlp-idle-removebg-preview.png',
-            harsh: 'harshpromlp-idle-removebg-preview.png'
+            harsh: 'harshpromlp-idle-v1.png'
         };
 
         const LEVELS = [
@@ -691,12 +693,12 @@
                 `;
 
                 let heat = 0;
-                let decay = 0.5;
+                let decay = 0.25; // NERFED from 0.5 to 0.25
                 const fire = document.getElementById('fire');
                 const frost = document.getElementById('frost');
 
                 Game.listen('keydown', (e) => {
-                    if(e.code === 'Space') heat = Math.min(100, heat + 15);
+                    if(e.code === 'Space') heat = Math.min(100, heat + 25); // BUFFED from 15 to 25
                 });
 
                 const loop = () => {
