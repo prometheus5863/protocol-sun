@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PROTOCOL: SUNS - DEFINITIVE EDITION</title>
+    <style>
+        :root {
+            --void-black: #050510;
+            --nuclear-orange: #FF4500;
+            --glitch-cyan: #00FFFF;
+            --static-white: #E0E0E0;
+            --ash-grey: #4A4A4A;
+            --deep-space: #000022;
+            --font-main: 'Courier New', monospace;
+        }
+
+        /* --- GLOBAL CRT & FX --- */
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--void-black);
+            color: var(--static-white);
+            font-family: var(--font-main);
+            overflow: hidden;
+            user-select: none;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .crt-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 9999;
+            box-shadow: inset 0 0 80px rgba(0,0,0,0.7);
+            animation: flicker 0.15s infinite;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.95; }
+            100% { opacity: 1; }
+        }
+
+        #particle-canvas {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* --- UI ELEMENTS --- */
+        .game-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: none;
+            z-index: 10;
+            overflow: hidden;
+        }
+        .game-layer.active { display: block; }
+
+        .btn {
+            background: rgba(0,0,0,0.8);
+            color: var(--nuclear-orange);
+            border: 2px solid var(--nuclear-orange);
+            padding: 15px 30px;
+            font-family: var(--font-main);
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: 0.3s;
+            font-size: 1rem;
+            margin: 10px;
+            letter-spacing: 2px;
+        }
+
+        .btn:hover {
+            background: var(--nuclear-orange);
+            color: var(--void-black);
+            box-shadow: 0 0 20px var(--nuclear-orange);
+        }
+
+        .instruction-text {
+            position: absolute;
+            top: 10%;
+            width: 100%;
+            text-align: center;
+            font-size: 0.9rem;
+            color: rgba(255,255,255,0.7);
+            text-shadow: 0 0 5px black;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        /* --- SPRITES --- */
+        .sprite {
+            position: absolute;
+            width: 64px; height: 64px;
+            background-size: 500% 500%; /* 5x5 Grid */
+            background-repeat: no-repeat;
+            image-rendering: pixelated;
+            z-index: 20;
+            transition: left 0.1s linear, bottom 0.1s linear, transform 0.2s;
+        }
+        .sprite-nan { background-image: url('nanlp-idle-removebg-preview.png'); }
+        .sprite-harsh { background-image: url('harshpromlp-idle-removebg-preview.png'); }
+
+        /* --- LEVEL 1: BRIDGE --- */
+        #level-1 { background: linear-gradient(to bottom, #1a0505, #4a0000); }
+        .bridge-segment {
+            position: absolute; bottom: 20%; width: 10%; height: 20px;
+            background: #333; border-top: 2px solid #888;
+            transition: transform 0.5s ease-in, opacity 0.5s;
+        }
+        .bridge-segment.collapsed { transform: translateY(200px) rotate(15deg); opacity: 0; }
+
+        /* --- LEVEL 2: GRAVITY --- */
+        #level-2 { background: radial-gradient(circle at center, #001, #000); }
+        .platform {
+            position: absolute;
+            background: #222;
+            border: 1px solid var(--glitch-cyan);
+            color: var(--glitch-cyan);
+            display: flex; justify-content: center; align-items: center;
+            font-size: 0.7rem;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+        }
+
+        /* --- LEVEL 3: CIRCUIT --- */
+        #level-3 { background: #111; display: flex; align-items: center; justify-content: center; }
+        .circuit-grid { display: grid; grid-template-columns: repeat(3, 80px); gap: 10px; }
+        .tile {
+            width: 80px; height: 80px; background: #222; border: 2px solid #444;
+            cursor: pointer; position: relative;
+        }
+        .tile::after {
+            content: ''; position: absolute; background: #555;
+            top: 35px; left: 0; width: 100%; height: 10px;
+            box-shadow: 0 0 5px #000;
+        }
+        .tile.active { border-color: var(--nuclear-orange); }
+        .tile.active::after { background: var(--nuclear-orange); box-shadow: 0 0 15px var(--nuclear-orange); }
+
+        /* --- LEVEL 4: FROZEN --- */
+        #level-4 { background: #000510; }
+        .frost-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, transparent 20%, rgba(100, 200, 255, 0.2) 80%);
+            pointer-events: none; transition: opacity 0.5s;
+        }
+        .campfire {
+            position: absolute; bottom: 20%; left: 50%; width: 60px; height: 60px;
+            background: radial-gradient(#ffaa00, transparent);
+            opacity: 0; transition: opacity 1s;
+            animation: pulse-fire 0.5s infinite alternate;
+        }
+        @keyframes pulse-fire { from { transform: scale(1); } to { transform: scale(1.2); } }
+
+        /* --- LEVEL 5: WIND --- */
+        #level-5 { background: linear-gradient(90deg, #222, #111, #000); }
+        .wind-particle {
+            position: absolute; background: rgba(255,255,255,0.2); height: 2px;
+        }
+
+        /* --- LEVEL 6: RHYTHM --- */
+        #level-6 { background: #000; }
+        .rhythm-track {
+            position: absolute; top: 40%; left: 50%; transform: translateX(-50%);
+            width: 300px; height: 40px; border: 2px solid #444;
+        }
+        .hit-zone {
+            position: absolute; left: 50%; top: 0; height: 100%; width: 40px;
+            transform: translateX(-50%); background: rgba(255, 69, 0, 0.3);
+            border-left: 2px solid var(--nuclear-orange); border-right: 2px solid var(--nuclear-orange);
+        }
+        .beat-marker {
+            position: absolute; left: 0; top: 0; height: 100%; width: 4px;
+            background: var(--glitch-cyan); box-shadow: 0 0 10px var(--glitch-cyan);
+        }
+
+        /* --- LEVEL 7: RADIO --- */
+        #level-7 { background: #051005; }
+        .radio-tuner {
+            position: absolute; bottom: 15%; width: 100%; text-align: center; color: #0f0;
+        }
+        input[type=range] { width: 300px; accent-color: #0f0; }
+
+        /* --- DIALOGUE --- */
+        .dialogue-box {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            width: 80%; max-width: 700px; height: 140px;
+            background: rgba(10, 10, 10, 0.95); border: 2px solid var(--static-white);
+            display: none; padding: 20px; gap: 20px; align-items: center;
+            z-index: 8000; box-shadow: 0 0 20px rgba(255, 69, 0, 0.3);
+        }
+        .portrait {
+            width: 100px; height: 100px; border: 1px solid #555;
+            background-size: cover; flex-shrink: 0; image-rendering: pixelated;
+        }
+        .text-area { flex-grow: 1; }
+        .char-name { color: var(--nuclear-orange); font-weight: bold; font-size: 1.1rem; margin-bottom: 5px; display: block; }
+        .dialogue-content { font-size: 1rem; line-height: 1.4; }
+        .next-indicator { font-size: 0.8rem; animation: blink 1s infinite; margin-top: 10px; color: #888; }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* --- CHOICES --- */
+        .choice-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); display: none;
+            flex-direction: column; justify-content: center; align-items: center;
+            z-index: 9000;
+        }
+
+        /* --- MENU --- */
+        .menu-container {
+            height: 100%; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            background: radial-gradient(circle, #222, #000);
+        }
+        .mission-btn {
+            width: 350px; text-align: left; padding: 15px; margin: 5px;
+            background: transparent; border: 1px solid #444; color: #888;
+            font-family: var(--font-main); cursor: pointer; transition: 0.2s;
+            display: flex; justify-content: space-between;
+        }
+        .mission-btn.unlocked { border-color: var(--static-white); color: var(--static-white); }
+        .mission-btn.unlocked:hover { border-color: var(--nuclear-orange); color: var(--nuclear-orange); background: rgba(255, 69, 0, 0.1); }
+        .mission-btn.completed { text-decoration: line-through; color: var(--glitch-cyan); border-color: var(--glitch-cyan); }
+
+    </style>
+</head>
+<body>
+
+    <div class="crt-overlay"></div>
+    <canvas id="particle-canvas"></canvas>
+
+    <!-- GAME LAYERS -->
+    <div id="game-stage">
+        
+        <!-- MAIN MENU -->
+        <div id="menu" class="game-layer active">
+            <div class="menu-container">
+                <h1 style="font-size: 3rem; color: var(--static-white); text-shadow: 4px 4px var(--nuclear-orange); margin-bottom: 5px;">PROTOCOL: SUNS</h1>
+                <p style="color: var(--glitch-cyan); margin-bottom: 30px;">SUBJECT: NAN // GUIDE: HARSH</p>
+                <div id="level-list"></div>
+                <button class="btn" style="margin-top: 30px;" onclick="Game.resetData()">RESET PROTOCOL</button>
+            </div>
+        </div>
+
+        <!-- LEVEL CONTAINERS -->
+        <div id="level-container" class="game-layer"></div>
+
+    </div>
+
+    <!-- DIALOGUE SYSTEM -->
+    <div class="dialogue-box" id="dialogue-box">
+        <div class="portrait" id="d-portrait"></div>
+        <div class="text-area">
+            <span class="char-name" id="d-name">NAME</span>
+            <div class="dialogue-content" id="d-text">...</div>
+        </div>
+        <div class="next-indicator">[PRESS SPACE]</div>
+    </div>
+
+    <!-- CHOICE SYSTEM -->
+    <div class="choice-overlay" id="choice-overlay">
+        <h2 style="color: var(--static-white); margin-bottom: 30px;">DECIDE THE FATE</h2>
+        <div id="choice-buttons"></div>
+    </div>
+
+    <script>
+        // --- ASSET CONFIGURATION ---
+        const ASSETS = {
+            nan: 'nanlp-idle-removebg-preview.png',
+            harsh: 'harshpromlp-idle-removebg-preview.png'
+        };
+
+        const LEVELS = [
+            { id: 1, title: "BURNING ROSES" },
+            { id: 2, title: "GRAVITY DEBRIS" },
+            { id: 3, title: "CIRCUIT WAKE" },
+            { id: 4, title: "FROZEN PROMISE" },
+            { id: 5, title: "CATALYTIC EDGE" },
+            { id: 6, title: "BLACKOUT RHYTHM" },
+            { id: 7, title: "REQUIEM SIGNAL" },
+            { id: 8, title: "THE MESSENGER" }
+        ];
+
+        // --- SPRITE ANIMATOR (5x5 Grid) ---
+        const SpriteSystem = {
+            timer: null,
+            frame: 0,
+            
+            start: function() {
+                if(this.timer) return;
+                // Run at 12 FPS
+                this.timer = setInterval(() => this.update(), 1000/12);
+            },
+
+            update: function() {
+                this.frame = (this.frame + 1) % 25; // 25 frames total
+                const col = this.frame % 5;
+                const row = Math.floor(this.frame / 5);
+                
+                // Calculate percentage (0, 25, 50, 75, 100)
+                const xPos = col * 25;
+                const yPos = row * 25;
+
+                const sprites = document.querySelectorAll('.sprite');
+                sprites.forEach(s => {
+                    s.style.backgroundPosition = `${xPos}% ${yPos}%`;
+                });
+            }
+        };
+
+        // --- PARTICLE SYSTEM ---
+        const Particles = {
+            canvas: document.getElementById('particle-canvas'),
+            ctx: document.getElementById('particle-canvas').getContext('2d'),
+            items: [],
+            
+            init: function() {
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+                for(let i=0; i<60; i++) this.items.push(this.create());
+                this.loop();
+            },
+
+            resize: function() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+            },
+
+            create: function() {
+                return {
+                    x: Math.random() * this.canvas.width,
+                    y: Math.random() * this.canvas.height,
+                    size: Math.random() * 2 + 1,
+                    speed: Math.random() * 1 + 0.5,
+                    opacity: Math.random() * 0.5 + 0.1
+                };
+            },
+
+            loop: function() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.fillStyle = "#FFF";
+                
+                this.items.forEach(p => {
+                    p.y += p.speed;
+                    if(p.y > this.canvas.height) p.y = 0;
+                    this.ctx.globalAlpha = p.opacity;
+                    this.ctx.fillRect(p.x, p.y, p.size, p.size);
+                });
+                
+                requestAnimationFrame(() => this.loop());
+            }
+        };
+
+        // --- GAME ENGINE ---
+        const Game = {
+            progress: parseInt(localStorage.getItem('suns_progress')) || 1,
+            activeLoop: null,
+            activeListeners: [],
+
+            init: function() {
+                SpriteSystem.start();
+                Particles.init();
+                this.renderMenu();
+            },
+
+            resetData: function() {
+                if(confirm("WIPE ALL MEMORY FRAGMENTS?")) {
+                    localStorage.clear();
+                    location.reload();
+                }
+            },
+
+            completeLevel: function(id) {
+                if(this.progress <= id) {
+                    this.progress = id + 1;
+                    localStorage.setItem('suns_progress', this.progress);
+                }
+                alert(`FRAGMENT ${id} RECOVERED. MEMORY SYNCED.`);
+                this.renderMenu();
+            },
+
+            cleanup: function() {
+                if(this.activeLoop) cancelAnimationFrame(this.activeLoop);
+                this.activeListeners.forEach(l => document.removeEventListener(l.type, l.handler));
+                this.activeListeners = [];
+                document.getElementById('dialogue-box').style.display = 'none';
+            },
+
+            renderMenu: function() {
+                this.cleanup();
+                document.getElementById('menu').classList.add('active');
+                document.getElementById('level-container').classList.remove('active');
+                
+                const list = document.getElementById('level-list');
+                list.innerHTML = '';
+
+                LEVELS.forEach(l => {
+                    const btn = document.createElement('div');
+                    let statusClass = 'locked';
+                    let statusText = '[LOCKED]';
+
+                    if(l.id < this.progress) { statusClass = 'completed'; statusText = '[SYNCED]'; }
+                    else if(l.id === this.progress) { statusClass = 'unlocked'; statusText = '[ACTIVE]'; }
+
+                    btn.className = `mission-btn ${statusClass}`;
+                    btn.innerHTML = `<span>LVL ${l.id} // ${l.title}</span> <span>${statusText}</span>`;
+                    
+                    if(statusClass !== 'locked') {
+                        btn.onclick = () => this.loadLevel(l.id);
+                    }
+                    list.appendChild(btn);
+                });
+            },
+
+            loadLevel: function(id) {
+                document.getElementById('menu').classList.remove('active');
+                const con = document.getElementById('level-container');
+                con.classList.add('active');
+                con.innerHTML = ''; 
+
+                // Load Level Logic
+                const levelObj = [null, Level1, Level2, Level3, Level4, Level5, Level6, Level7, Level8][id];
+                if(levelObj) levelObj.init(con);
+            },
+
+            // Helper to add listeners that auto-cleanup
+            listen: function(type, handler) {
+                document.addEventListener(type, handler);
+                this.activeListeners.push({type, handler});
+            }
+        };
+
+        // --- STORY ENGINE ---
+        const Story = {
+            show: function(char, text, callback) {
+                const box = document.getElementById('dialogue-box');
+                const p = document.getElementById('d-portrait');
+                const t = document.getElementById('d-text');
+                const n = document.getElementById('d-name');
+
+                box.style.display = 'flex';
+                n.textContent = char.toUpperCase();
+                t.textContent = '';
+                
+                // Set Portrait
+                if(char === 'Nan') p.style.backgroundImage = `url('${ASSETS.nan}')`;
+                else if(char === 'Harsh') p.style.backgroundImage = `url('${ASSETS.harsh}')`;
+
+                // Typewriter
+                let i = 0;
+                const type = () => {
+                    if(i < text.length) {
+                        t.textContent += text.charAt(i);
+                        i++;
+                        setTimeout(type, 30);
+                    } else {
+                        // Wait for input
+                        const handler = (e) => {
+                            if(e.code === 'Space') {
+                                document.removeEventListener('keydown', handler);
+                                box.style.display = 'none';
+                                if(callback) callback();
+                            }
+                        };
+                        // Short delay to prevent accidental skips
+                        setTimeout(() => document.addEventListener('keydown', handler), 200);
+                    }
+                };
+                type();
+            },
+
+            choice: function(optA, optB, cbA, cbB) {
+                const ol = document.getElementById('choice-overlay');
+                const con = document.getElementById('choice-buttons');
+                con.innerHTML = '';
+                ol.style.display = 'flex';
+
+                [ {txt: optA, cb: cbA}, {txt: optB, cb: cbB} ].forEach(opt => {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn';
+                    btn.textContent = opt.txt;
+                    btn.onclick = () => {
+                        ol.style.display = 'none';
+                        opt.cb();
+                    };
+                    con.appendChild(btn);
+                });
+            }
+        };
+
+        // =========================================================================
+        // LEVEL LOGIC MODULES
+        // =========================================================================
+
+        // --- LVL 1: BURNING ROSES (Bridge) ---
+        const Level1 = {
+            init: function(con) {
+                con.style.background = "linear-gradient(#220505, #000)";
+                con.innerHTML = `
+                    <div class="instruction-text">BRIDGE COLLAPSING. RIGHT ARROW TO RUN.</div>
+                    <div id="l1-bridge" style="position:absolute; bottom:20%; width:100%; height:20px;"></div>
+                    <div id="nan" class="sprite sprite-nan" style="left:5%; bottom:20%;"></div>
+                    <div id="harsh" class="sprite sprite-harsh" style="right:10%; bottom:20%;"></div>
+                `;
+
+                // Generate Bridge
+                const bCon = document.getElementById('l1-bridge');
+                const segs = [];
+                for(let i=0; i<8; i++) {
+                    let d = document.createElement('div');
+                    d.className = 'bridge-segment';
+                    d.style.left = (15 + (i*10)) + '%';
+                    bCon.appendChild(d);
+                    segs.push(d);
+                }
+
+                let pos = 0; // Segment index
+                const nan = document.getElementById('nan');
+                
+                Game.listen('keydown', (e) => {
+                    if(e.code === 'ArrowRight') {
+                        pos++;
+                        // Move visual
+                        nan.style.left = (15 + (pos * 10)) + '%';
+                        
+                        // Collapse behind
+                        if(pos > 0 && segs[pos-1]) segs[pos-1].classList.add('collapsed');
+
+                        // End Condition
+                        if(pos >= 7) {
+                            Game.cleanup();
+                            Story.show('Harsh', "I'm swimming in the smoke of bridges I have burned.", () => {
+                                Story.choice(
+                                    "A) 'You can build them back.'",
+                                    "B) 'Don't apologize. I'm losing what I don't deserve.'",
+                                    () => Game.renderMenu(), // Fail/Retreat
+                                    () => Game.completeLevel(1) // Win
+                                );
+                            });
+                        }
+                    }
+                });
+
+                Story.show('Nan', "The bridge is made of ash. I have to be fast.");
+            }
+        };
+
+        // --- LVL 2: GRAVITY DEBRIS (Physics) ---
+        const Level2 = {
+            init: function(con) {
+                con.style.background = "#020205";
+                con.innerHTML = `
+                    <div class="instruction-text">ARROWS TO MOVE. SPACE TO JUMP.</div>
+                    <div class="platform" style="left:50px; bottom:50px; width:100px; height:20px;">START</div>
+                    <div class="platform" style="left:250px; bottom:150px; width:80px; height:20px;">DEBRIS</div>
+                    <div class="platform" style="left:450px; bottom:250px; width:80px; height:20px;">TV</div>
+                    <div class="platform" style="left:650px; bottom:200px; width:80px; height:20px;">RADIO</div>
+                    <div class="platform" style="left:800px; bottom:350px; width:100px; height:20px;">GOAL</div>
+                    
+                    <div id="hero" class="sprite sprite-nan" style="left:50px; bottom:70px;"></div>
+                    <div class="sprite sprite-harsh" style="left:820px; bottom:370px;"></div>
+                `;
+
+                let x=50, y=70, vx=0, vy=0, grounded=false;
+                const hero = document.getElementById('hero');
+                const plats = document.querySelectorAll('.platform');
+                const keys = {};
+
+                Game.listen('keydown', e => keys[e.code] = true);
+                Game.listen('keyup', e => keys[e.code] = false);
+
+                const loop = () => {
+                    // Physics
+                    if(keys['ArrowRight']) vx += 0.5;
+                    if(keys['ArrowLeft']) vx -= 0.5;
+                    vx *= 0.9; 
+                    x += vx;
+
+                    if(keys['Space'] && grounded) { vy = 12; grounded = false; }
+                    vy -= 0.5; // Low gravity
+                    y += vy;
+
+                    grounded = false;
+
+                    // Floor Death
+                    if(y < -100) { x=50; y=70; vx=0; vy=0; }
+
+                    // Collision
+                    const hr = {l:x+10, r:x+50, t:y+64, b:y}; // tight hitbox
+                    plats.forEach(p => {
+                        const l = parseInt(p.style.left);
+                        const b = parseInt(p.style.bottom);
+                        const w = parseInt(p.style.width);
+                        const h = 20;
+
+                        if(hr.r > l && hr.l < l+w && hr.t > b && hr.b < b+h) {
+                            if(vy < 0 && (hr.b - vy) >= b+h) {
+                                y = b+h; vy = 0; grounded = true;
+                            }
+                        }
+                    });
+
+                    hero.style.left = x + 'px';
+                    hero.style.bottom = y + 'px';
+
+                    // Goal
+                    if(Math.abs(x - 820) < 50 && Math.abs(y - 370) < 50) {
+                        cancelAnimationFrame(Game.activeLoop);
+                        Story.show('Harsh', "The gravity is too heavy here... Just hold my hand.", () => {
+                            Story.choice(
+                                "A) 'Let go.'", "B) 'Start again.'",
+                                () => Game.renderMenu(),
+                                () => Game.completeLevel(2)
+                            );
+                        });
+                        return;
+                    }
+                    Game.activeLoop = requestAnimationFrame(loop);
+                };
+                loop();
+                Story.show('Nan', "I'm floating... waiting for the proposal to end.");
+            }
+        };
+
+        // --- LVL 3: CIRCUIT WAKE (Logic) ---
+        const Level3 = {
+            init: function(con) {
+                con.style.background = "#111";
+                con.innerHTML = `
+                    <div class="instruction-text">CLICK TILES TO ROTATE. COMPLETE THE LINE.</div>
+                    <div style="display:flex; justify-content:center; align-items:center; height:100%;">
+                        <div class="circuit-grid">
+                            <div class="tile" data-r="90"></div>
+                            <div class="tile" data-r="0"></div>
+                            <div class="tile" data-r="270"></div>
+                        </div>
+                    </div>
+                    <div class="sprite sprite-harsh" id="robot" style="bottom:50%; right:10%; filter:grayscale(1);"></div>
+                `;
+
+                const tiles = document.querySelectorAll('.tile');
+                tiles.forEach(t => {
+                    // Random start rot
+                    let r = Math.floor(Math.random()*4)*90;
+                    t.style.transform = `rotate(${r}deg)`;
+                    t.onclick = () => {
+                        r += 90;
+                        t.style.transform = `rotate(${r}deg)`;
+                        check();
+                    }
+                });
+
+                const check = () => {
+                    // Check if all are horizontal (0, 180, 360...)
+                    let allOk = true;
+                    tiles.forEach(t => {
+                        const deg = parseInt(t.style.transform.replace(/\D/g,''));
+                        if((deg % 180) !== 0) allOk = false;
+                    });
+
+                    if(allOk) {
+                        tiles.forEach(t => t.classList.add('active'));
+                        document.getElementById('robot').style.filter = "none";
+                        setTimeout(() => {
+                            Story.show('Harsh', "You say you're not gonna fight 'cause no one will fight for you.", () => {
+                                Story.choice(
+                                    "A) 'Give Up'", "B) 'Wake Up'",
+                                    () => Game.renderMenu(), () => Game.completeLevel(3)
+                                );
+                            });
+                        }, 500);
+                    }
+                };
+            }
+        };
+
+        // --- LVL 4: FROZEN PROMISE (Mashing) ---
+        const Level4 = {
+            init: function(con) {
+                con.style.background = "#000";
+                con.innerHTML = `
+                    <div class="frost-overlay" id="frost"></div>
+                    <div class="instruction-text">MASH [SPACE] TO KINDLE THE FIRE</div>
+                    <div class="campfire" id="fire"></div>
+                    <div class="sprite sprite-harsh" style="right:40%; bottom:20%; opacity:0.6;"></div>
+                `;
+
+                let heat = 0;
+                let decay = 0.5;
+                const fire = document.getElementById('fire');
+                const frost = document.getElementById('frost');
+
+                Game.listen('keydown', (e) => {
+                    if(e.code === 'Space') heat = Math.min(100, heat + 15);
+                });
+
+                const loop = () => {
+                    heat -= decay;
+                    if(heat < 0) heat = 0;
+
+                    fire.style.opacity = heat / 100;
+                    frost.style.opacity = 1 - (heat / 120);
+
+                    if(heat >= 100) {
+                        cancelAnimationFrame(Game.activeLoop);
+                        Story.show('Harsh', "Do you feel cold and lost in desperation?", () => {
+                            Story.choice(
+                                "A) 'Yes'", "B) 'Let it go'",
+                                () => Game.renderMenu(), () => Game.completeLevel(4)
+                            );
+                        });
+                        return;
+                    }
+                    Game.activeLoop = requestAnimationFrame(loop);
+                };
+                loop();
+            }
+        };
+
+        // --- LVL 5: CATALYTIC EDGE (Wind) ---
+        const Level5 = {
+            init: function(con) {
+                con.innerHTML = `
+                    <div class="instruction-text"><<< STRONG WIND <<< HOLD RIGHT ARROW</div>
+                    <div id="nan" class="sprite sprite-nan" style="left:10%; bottom:20%;"></div>
+                    <div class="sprite sprite-harsh" style="right:10%; bottom:20%;"></div>
+                `;
+
+                let pos = 10;
+                const nan = document.getElementById('nan');
+                const keys = {};
+
+                Game.listen('keydown', e => keys[e.code] = true);
+                Game.listen('keyup', e => keys[e.code] = false);
+
+                const loop = () => {
+                    if(keys['ArrowRight']) pos += 0.8;
+                    pos -= 0.4; // Wind
+                    if(pos < 10) pos = 10;
+
+                    nan.style.left = pos + '%';
+
+                    if(pos > 75) {
+                        cancelAnimationFrame(Game.activeLoop);
+                        Story.show('Harsh', "God bless us everyone... we're a broken people.", () => {
+                            Story.choice(
+                                "A) 'Retreat'", "B) 'Symphonies of Light'",
+                                () => Game.renderMenu(), () => Game.completeLevel(5)
+                            );
+                        });
+                        return;
+                    }
+                    Game.activeLoop = requestAnimationFrame(loop);
+                };
+                loop();
+            }
+        };
+
+        // --- LVL 6: BLACKOUT RHYTHM ---
+        const Level6 = {
+            init: function(con) {
+                con.innerHTML = `
+                    <div class="instruction-text">PRESS SPACE WHEN MARKER HITS ORANGE</div>
+                    <div class="rhythm-track">
+                        <div class="hit-zone"></div>
+                        <div id="marker" class="beat-marker"></div>
+                    </div>
+                    <div class="sprite sprite-harsh" id="target" style="right:45%; bottom:20%; opacity:0.3;"></div>
+                `;
+
+                let pos = 0;
+                let dir = 2;
+                let hits = 0;
+                const m = document.getElementById('marker');
+                const h = document.getElementById('target');
+                let active = true;
+
+                Game.listen('keydown', (e) => {
+                    if(e.code === 'Space' && active) {
+                        // Center is 150px. Hit zone is 130-170
+                        if(pos > 130 && pos < 170) {
+                            hits++;
+                            h.style.opacity = 0.3 + (hits * 0.15);
+                            m.style.background = "#FFF"; // Flash
+                            setTimeout(() => m.style.background = "cyan", 100);
+
+                            if(hits >= 5) {
+                                active = false;
+                                cancelAnimationFrame(Game.activeLoop);
+                                Story.show('Harsh', "Floating down, as colors fill the light.", () => {
+                                    Story.choice(
+                                        "A) 'Reality'", "B) 'Look Inside'",
+                                        () => Game.renderMenu(), () => Game.completeLevel(6)
+                                    );
+                                });
+                            }
+                        }
+                    }
+                });
+
+                const loop = () => {
+                    if(!active) return;
+                    pos += dir;
+                    if(pos > 296 || pos < 0) dir *= -1;
+                    m.style.left = pos + 'px';
+                    Game.activeLoop = requestAnimationFrame(loop);
+                };
+                loop();
+            }
+        };
+
+        // --- LVL 7: REQUIEM SIGNAL ---
+        const Level7 = {
+            init: function(con) {
+                con.innerHTML = `
+                    <div class="instruction-text">TUNE THE FREQUENCY TO 102.5</div>
+                    <div class="radio-tuner">
+                        <h1><span id="freq">88.0</span> MHz</h1>
+                        <input type="range" id="range" min="88" max="108" step="0.1" value="88">
+                    </div>
+                `;
+
+                const r = document.getElementById('range');
+                const f = document.getElementById('freq');
+                const overlay = document.querySelector('.crt-overlay');
+
+                r.oninput = () => {
+                    const val = parseFloat(r.value);
+                    f.innerText = val.toFixed(1);
+                    
+                    const dist = Math.abs(val - 102.5);
+                    // More static if far away
+                    overlay.style.opacity = 0.2 + (dist/10);
+
+                    if(dist < 0.2) {
+                        r.disabled = true;
+                        Story.show('Harsh', "I'm burning in the skies... Lift me up. Let me go.", () => {
+                            Story.choice(
+                                "A) 'Silence'", "B) 'Requiem'",
+                                () => Game.renderMenu(), () => Game.completeLevel(7)
+                            );
+                        });
+                    }
+                };
+            }
+        };
+
+        // --- LVL 8: THE MESSENGER (Finale) ---
+        const Level8 = {
+            init: function(con) {
+                con.style.background = "linear-gradient(#FFD700, #87CEEB)";
+                con.innerHTML = `
+                    <div class="instruction-text">WALK TO HIM.</div>
+                    <div id="nan" class="sprite sprite-nan" style="left:10%; bottom:20%;"></div>
+                    <div class="sprite sprite-harsh" style="right:10%; bottom:20%;"></div>
+                `;
+
+                let pos = 10;
+                const nan = document.getElementById('nan');
+                
+                Game.listen('keydown', (e) => {
+                    if(e.code === 'ArrowRight') {
+                        pos += 1;
+                        nan.style.left = pos + '%';
+                        
+                        if(pos > 75) {
+                            Game.cleanup();
+                            Story.show('Harsh', "When life leaves us blind, love keeps us kind.", () => {
+                                alert("PROTOCOL: SUNS COMPLETED.\n\nThank you for playing.");
+                                Game.resetData();
+                            });
+                        }
+                    }
+                });
+            }
+        };
+
+        // --- BOOT ---
+        window.onload = () => Game.init();
+
+    </script>
+</body>
+</html>
