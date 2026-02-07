@@ -93,18 +93,30 @@
             z-index: 50;
         }
 
-        /* --- SPRITES --- */
+        /* --- SPRITES (UPDATED SIZES) --- */
         .sprite {
             position: absolute;
-            width: 64px; height: 64px;
-            background-size: 500% 500%; /* 5x5 Grid */
             background-repeat: no-repeat;
+            background-position: bottom center;
+            background-size: contain; /* Important for static images */
             image-rendering: pixelated;
             z-index: 20;
             transition: left 0.1s linear, bottom 0.1s linear, transform 0.2s;
         }
-        .sprite-nan { background-image: url('nanlp-idle-removebg-preview.png'); }
-        .sprite-harsh { background-image: url('harshpromlp-idle-removebg-preview.png'); }
+
+        /* Girl: Short (~100px) */
+        .sprite-nan { 
+            width: 80px; 
+            height: 100px; 
+            background-image: url('nanlp-idle-removebg-preview.png'); 
+        }
+
+        /* Guy: Tall (~180px) */
+        .sprite-harsh { 
+            width: 64px; 
+            height: 180px; 
+            background-image: url('harshpromlp-idle-removebg-preview.png'); 
+        }
 
         /* --- LEVEL 1: BRIDGE --- */
         #level-1 { background: linear-gradient(to bottom, #1a0505, #4a0000); }
@@ -287,30 +299,14 @@
             { id: 8, title: "THE MESSENGER" }
         ];
 
-        // --- SPRITE ANIMATOR (5x5 Grid) ---
+        // --- SPRITE SYSTEM (UPDATED: NO LOOP) ---
         const SpriteSystem = {
-            timer: null,
-            frame: 0,
-            
+            // No loop needed for static images
             start: function() {
-                if(this.timer) return;
-                // Run at 12 FPS
-                this.timer = setInterval(() => this.update(), 1000/12);
+                // Static init if needed
             },
-
             update: function() {
-                this.frame = (this.frame + 1) % 25; // 25 frames total
-                const col = this.frame % 5;
-                const row = Math.floor(this.frame / 5);
-                
-                // Calculate percentage (0, 25, 50, 75, 100)
-                const xPos = col * 25;
-                const yPos = row * 25;
-
-                const sprites = document.querySelectorAll('.sprite');
-                sprites.forEach(s => {
-                    s.style.backgroundPosition = `${xPos}% ${yPos}%`;
-                });
+                // No frame update needed
             }
         };
 
@@ -567,6 +563,7 @@
                     <div class="sprite sprite-harsh" style="left:820px; bottom:370px;"></div>
                 `;
 
+                // Adjust starting position to sit on top of platform (50px + 20px = 70px)
                 let x=50, y=70, vx=0, vy=0, grounded=false;
                 const hero = document.getElementById('hero');
                 const plats = document.querySelectorAll('.platform');
@@ -591,8 +588,10 @@
                     // Floor Death
                     if(y < -100) { x=50; y=70; vx=0; vy=0; }
 
-                    // Collision
-                    const hr = {l:x+10, r:x+50, t:y+64, b:y}; // tight hitbox
+                    // Collision (UPDATED HITBOX FOR NAN)
+                    // Nan Width ~80, Height ~100
+                    const hr = {l:x+20, r:x+60, t:y+100, b:y}; // Tighter hitbox than full image
+                    
                     plats.forEach(p => {
                         const l = parseInt(p.style.left);
                         const b = parseInt(p.style.bottom);
@@ -609,8 +608,8 @@
                     hero.style.left = x + 'px';
                     hero.style.bottom = y + 'px';
 
-                    // Goal
-                    if(Math.abs(x - 820) < 50 && Math.abs(y - 370) < 50) {
+                    // Goal (Distance check)
+                    if(Math.abs(x - 820) < 80 && Math.abs(y - 370) < 80) {
                         cancelAnimationFrame(Game.activeLoop);
                         Story.show('Harsh', "The gravity is too heavy here... Just hold my hand.", () => {
                             Story.choice(
@@ -869,6 +868,7 @@
                         pos += 1;
                         nan.style.left = pos + '%';
                         
+                        // Adjusted end trigger for new positions
                         if(pos > 75) {
                             Game.cleanup();
                             Story.show('Harsh', "When life leaves us blind, love keeps us kind.", () => {
