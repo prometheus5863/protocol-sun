@@ -115,7 +115,7 @@
         /* Guy: Tall (~180px) - Flipped to face Left */
         .sprite-harsh { 
             width: 64px; 
-            height: 180px; 
+            height: 120px; 
             background-image: url('harshpromlp-idle-v1.png'); 
         }
 
@@ -612,9 +612,9 @@
                     // Goal (Distance check)
                     if(Math.abs(x - 820) < 80 && Math.abs(y - 370) < 80) {
                         cancelAnimationFrame(Game.activeLoop);
-                        Story.show('Harsh', "The gravity is too heavy here... Just hold my hand.", () => {
+                        Story.show('Harsh', "The gravity is too heavy here... Just hold my hand. The hardest part of ending is", () => {
                             Story.choice(
-                                "A) 'Let go.'", "B) 'Start again.'",
+                                "A) 'Letting go.'", "B) 'Starting again.'",
                                 () => Game.renderMenu(),
                                 () => Game.completeLevel(2)
                             );
